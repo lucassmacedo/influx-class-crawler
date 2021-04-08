@@ -17,6 +17,7 @@
     ],
     "require": {
         "php": "^7.3|^8.0",
+        "guzzlehttp/guzzle": "^7.2",
         "laminas/laminas-text": "^2.8",
         "laravel-zero/framework": "^8.4",
         "php-webdriver/webdriver": "^1.9"
@@ -42,5 +43,5 @@
     },
     "minimum-stability": "dev",
     "prefer-stable": true,
-    "bin": ["hotmart"]
+    "bin": ["influx"]
 }
