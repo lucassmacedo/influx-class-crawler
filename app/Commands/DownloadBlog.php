@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use LaravelZero\Framework\Commands\Command;
+use League\HTMLToMarkdown\HtmlConverter;
 use Symfony\Component\DomCrawler\Crawler;
 
 class DownloadBlog extends Command
@@ -33,32 +34,40 @@ class DownloadBlog extends Command
     public function handle()
     {
 
-        $url = 'https://blog.influx.com.br/ingles/o-que-sao-os-conversation-fillers-e-como-usa-los-em-ingles';
 
-        $html = file_get_contents($url);
-        $html = new Crawler($html);
-        $html = $html->filter('.post-content');
+        $links = file(storage_path('links.txt'), FILE_IGNORE_NEW_LINES);
+        // Open a file in write mode ('w')
+        $fp = fopen(storage_path('blog/data.csv'), 'w');
 
-        $data = [];
-        $html->filter('p')->each(function ($node) use (&$data, $url) {
+//        $progessBar = $this->output->createProgressBar(count($links));
 
-            $text_1 = $node->filter('em')->count() > 0 ? $node->filter('em')->html() : null;
-            $text_2 = $node->filter('strong')->count() > 0 ? $node->filter('strong')->html() : null;
-            $audio = $node->nextAll()->attr('src');
+        foreach ($links as $key => $link) {
 
-            $html = $node->html();
+//            $progessBar->advance();
 
-            if (preg_match('/(?:<strong.*?>(.*?)<em><u.*?>(.*?)<\/em>)/', $html, $matches)) {
-                $text_1 = strip_tags($matches[1]);
-                $text_2 = strip_tags($matches[2]);
-            }
+            $html = file_get_contents($link);
+            $html = new Crawler($html);
 
-            if (strlen($text_1) > 0 and strlen($text_2) > 0 and !is_null($audio)) {
+            $conv = new HtmlConverter(array('strip_tags' => true));
+            dd($conv->convert($html->filter('.post')->html()));
 
-                $mp3_url = "https://blog.influx.com.br/" . $audio;
+            $title = $html->filter('title')->text();
+
+            $html = $html->filter('.post-content');
+
+
+            $data = [];
+            $html->filter('audio')->each(function ($node) use (&$data, $link) {
+                $data[] = $node->attr('src');
+            });
+
+
+            foreach ($data as $datum) {
+
+                $mp3_url = "https://blog.influx.com.br/" . $datum;
                 $name = str_replace('/', '', strrchr($mp3_url, "/"));
 
-                $folder = str_replace('/', '', strrchr($url, "/"));
+                $folder = str_replace('/', '', strrchr($link, "/"));
                 $filename = storage_path(sprintf('blog/%s/%s', $folder, $name));
 
                 $this->forceDir(storage_path(sprintf('blog/%s', $folder)));
@@ -68,27 +77,20 @@ class DownloadBlog extends Command
                     sleep(1);
                 }
 
+                $csv['title'] = $title;
+                $csv['name'] = $name;
+                $csv['post_url'] = $link;
+                $csv['audio_url'] = $mp3_url;
+                $csv['audio_file'] = $folder;
+                fputcsv($fp, $csv);
 
-                $data[] = [
-                    'english'    => $this->replaceToB($text_2),
-                    'portuguese' => $this->replaceToB($text_1),
-                    'audio'      => $audio
-                ];
 
+                $this->info(sprintf("%s - %s", $name, $filename));
             }
-        });
-
-        // Open a file in write mode ('w')
-        $fp = fopen(storage_path('blog/test.csv'), 'w');
-
-        // Loop through file pointer and a line
-        foreach ($data as $fields) {
-            fputcsv($fp, $fields);
         }
 
+//        $progessBar->finish();
         fclose($fp);
-
-        dd($data);
     }
 
     public function replaceToB($text)

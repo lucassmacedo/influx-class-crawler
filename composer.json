@@ -20,6 +20,7 @@
         "guzzlehttp/guzzle": "^7.2",
         "laminas/laminas-text": "^2.8",
         "laravel-zero/framework": "^8.4",
+        "league/html-to-markdown": "^5.0",
         "php-webdriver/webdriver": "^1.9",
         "symfony/css-selector": "^5.2",
         "symfony/dom-crawler": "^5.2"

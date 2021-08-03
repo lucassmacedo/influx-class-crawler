@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use Carbon\Carbon;
 use Facebook\WebDriver\WebDriverBy;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -52,6 +53,7 @@ class DownloadCommand extends Command
         parent::__construct();
         $this->client = new \GuzzleHttp\Client();
 
+
         if (Cache::has('user')) {
             $this->user = Cache::get('user');
             $this->token = $this->user->data->bearer->token;
@@ -66,9 +68,9 @@ class DownloadCommand extends Command
     public function handle()
     {
 
-        $this->doLogin();
-        $this->getPlusClass();
-//        $this->getAudiobooks();
+       $this->doLogin();
+       $this->getPlusClass();
+       $this->getAudiobooks();
     }
 
 
@@ -138,7 +140,6 @@ class DownloadCommand extends Command
 
     public function getPlusClass()
     {
-
         try {
             $this->plusClass = Cache::remember('list-by-student', 1000, function () {
                 $response = $this->client->get('https://api.books.influx.com.br/v1/mountain/list-by-student', [
@@ -164,17 +165,43 @@ class DownloadCommand extends Command
                     return json_decode($response->getBody()->getContents());
                 });
 
-                dd($this->plusNoticies);
+//                dd(collect($this->plusNoticies)->where('presentationType','TYPE_AUDIO'));
+//                foreach ($this->plusNoticies as $plusNoticy) {
+//
+//                    if ($plusNoticy->presentationType == 'TYPE_IMAGE'
+//                        && preg_match("/(?:http(?:s)?:\/\/)?(?:www\.)?(?:youtu\.be\/|youtube\.com\/(?:(?:watch)?\?(?:.*&)?v(?:i)?=|(?:embed|v|vi|user)\/))([^\?&\"'<> #]+)/", $plusNoticy->text, $mathes)) {
+//                        $this->info(sprintf(".:: Gravando %s - %s  ::.", $item->bookOwner, $plusNoticy->title));
+//                        Storage::disk('local')->prepend("LinksYoutube.csv", sprintf("%s;%s;%s", $plusNoticy->title, $mathes[0], $plusNoticy->createdAt));
+//                    } else {
+//                        continue;
+//                    }
+//                }
+
                 foreach ($this->plusNoticies as $plusNoticy) {
 
-                    if ($plusNoticy->presentationType == 'TYPE_IMAGE'
-                        && preg_match("/(?:http(?:s)?:\/\/)?(?:www\.)?(?:youtu\.be\/|youtube\.com\/(?:(?:watch)?\?(?:.*&)?v(?:i)?=|(?:embed|v|vi|user)\/))([^\?&\"'<> #]+)/", $plusNoticy->text, $mathes)) {
-                        $this->info(sprintf(".:: Gravando %s - %s  ::.", $item->bookOwner, $plusNoticy->title));
-                        Storage::disk('local')->prepend("LinksYoutube.csv", sprintf("%s;%s;%s", $plusNoticy->title, $mathes[0], $plusNoticy->createdAt));
+                    if ($plusNoticy->presentationType == 'TYPE_AUDIO') {
+
+                        $this->info(sprintf(".:: Baixando %s ::.", $plusNoticy->title));
+                        $this->forceDir(storage_path('data/podcasts/'));
+
+                        $mp3_url = $plusNoticy->audioUrl;
+                        $name = sprintf("%s - %s - %s", Carbon::parse($plusNoticy->createdAt)->toDateString(), $plusNoticy->bookName, $plusNoticy->title);
+
+                        $filename = storage_path(sprintf('data/podcasts/%s.mp3', $name));
+
+                        if (!file_exists($filename)) {
+
+                            try {
+                                file_put_contents($filename, file_get_contents(urlencode($mp3_url)));
+                            } catch (\Exception $exception) {
+                                $this->info("Falha: " . $mp3_url);
+                            }
+                            sleep(1);
+                        }
+
                     } else {
                         continue;
                     }
-
                 }
             }
         } catch (\Exception $exception) {
